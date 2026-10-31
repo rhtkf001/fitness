@@ -11,13 +11,11 @@
       overflow: hidden; position: fixed; width: 100%; height: 100%; touch-action: none;
     }
     
-    /* 1층: 배경 운동 영상 */
     #bgVideo {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       object-fit: cover; z-index: 1; opacity: 0.8;
     }
     
-    /* 2층: 아바타 및 미니게임 타겟 캔버스 */
     #gameCanvas {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       z-index: 2; pointer-events: none;
@@ -25,26 +23,23 @@
 
     #webcam { display: none; }
 
-    /* 3층: 모바일 터치 최적화 상단 UI */
     #uiLayer {
       position: absolute; top: 10px; left: 10px; right: 10px; z-index: 3;
       display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none;
     }
     .interactive { pointer-events: auto; }
 
-    .control-wrap { display: flex; flex-direction: column; gap: 6px; max-width: 62%; }
+    .control-wrap { display: flex; flex-direction: column; gap: 6px; max-width: 68%; }
     .toggle-bar { display: flex; gap: 6px; }
     
     .panel {
-      background: rgba(10, 10, 18, 0.78); border: 1px solid #00ffcc;
+      background: rgba(10, 10, 18, 0.82); border: 1px solid #00ffcc;
       padding: 10px; border-radius: 12px; backdrop-filter: blur(6px);
     }
-    .btn-grid {
-      display: flex; flex-wrap: wrap; gap: 6px;
-    }
+    .btn-grid { display: flex; flex-wrap: wrap; gap: 6px; }
     .btn {
       background: #00ffcc; color: #000; font-weight: 800; border: none;
-      padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 12px;
+      padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 12px;
       white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
     .btn:active { transform: scale(0.95); }
@@ -53,7 +48,18 @@
     .btn.sub-btn { background: #222; color: #fff; border: 1px solid #555; }
     input[type="file"] { display: none; }
 
-    /* 우측 점수판 (모바일 화면에서도 잘 보이게 큼직하게) */
+    /* 크기 및 위치 조절 슬라이더 UI */
+    .slider-box {
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);
+      display: flex; flex-direction: column; gap: 6px; font-size: 12px;
+    }
+    .slider-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .slider-row input[type="range"] { flex: 1; accent-color: #00ffcc; height: 6px; cursor: pointer; }
+    .val-badge {
+      background: #222; color: #00ffcc; padding: 2px 6px; border-radius: 4px;
+      font-weight: bold; min-width: 42px; text-align: center;
+    }
+
     .score-container { display: flex; gap: 8px; }
     .score-box { text-align: center; min-width: 78px; padding: 6px 10px; }
     .score-1p { border-color: #00ffcc; }
@@ -64,7 +70,6 @@
     .c-1p { color: #00ffcc; text-shadow: 0 0 8px #00ffcc; }
     .c-2p { color: #ff007f; text-shadow: 0 0 8px #ff007f; }
 
-    /* 화면 중앙 카운트다운 오버레이 */
     #centerCount {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       font-size: 90px; font-weight: 900; color: #ffff00;
@@ -81,7 +86,6 @@
   <div id="centerCount">3</div>
 
   <div id="uiLayer">
-    <!-- 좌측 컨트롤 영역 -->
     <div class="control-wrap interactive">
       <div class="toggle-bar">
         <button class="btn sub-btn" id="hideMenuBtn">⚙️ 메뉴 접기</button>
@@ -95,17 +99,31 @@
             <input type="file" id="videoInput" accept="video/*">
           </label>
           <button class="btn" id="modeBtn">👤 1P 단독</button>
-          <button class="btn active-yellow" id="targetBtn">🎯 과녁게임: ON</button>
+          <button class="btn active-yellow" id="targetBtn">🎯 과녁: ON</button>
           <button class="btn" id="calibBtn">⚡ 3초 영점 & 시작</button>
-          <button class="btn sub-btn" id="scaleBtn">크기: 전체</button>
         </div>
+
+        <!-- 졸라맨 크기 및 높낮이 실시간 조절 슬라이더 -->
+        <div class="slider-box">
+          <div class="slider-row">
+            <span>🔍 졸라맨 크기</span>
+            <input type="range" id="scaleSlider" min="0.5" max="3.0" step="0.1" value="1.0">
+            <span id="scaleVal" class="val-badge">1.0x</span>
+            <button class="btn sub-btn" id="resetScaleBtn" style="padding:3px 7px; font-size:11px;">초기화</button>
+          </div>
+          <div class="slider-row">
+            <span>↕️ 상하 위치</span>
+            <input type="range" id="offsetYSlider" min="-40" max="40" step="2" value="0">
+            <span id="offsetYVal" class="val-badge">0%</span>
+          </div>
+        </div>
+
         <div id="statusMsg" style="margin-top:6px; font-size:11px; color:#bbb;">
           모바일 AI 로딩 중... 카메라 권한을 허용해주세요.
         </div>
       </div>
     </div>
 
-    <!-- 우측 1P / 2P 점수판 -->
     <div class="score-container interactive">
       <div class="panel score-box score-1p">
         <div class="score-label c-1p">1P (왼쪽)</div>
@@ -132,15 +150,36 @@ const score1PEl = document.getElementById('score1P');
 const score2PEl = document.getElementById('score2P');
 const box2P = document.getElementById('box2P');
 
+const scaleSlider = document.getElementById('scaleSlider');
+const scaleVal = document.getElementById('scaleVal');
+const offsetYSlider = document.getElementById('offsetYSlider');
+const offsetYVal = document.getElementById('offsetYVal');
+
 let poseLandmarker = null;
 let numPlayers = 1;
-let miniAvatarMode = false;
-let targetGameOn = true; // 과녁 미니게임 활성화 여부
+let avatarScale = 1.0; // 졸라맨 크기 배율 (기본 1.0배)
+let avatarOffsetY = 0; // 상하 위치 이동값 (%)
+let targetGameOn = true;
+let useFallbackVideo = false;
 let particles = [];
-let targets = []; // 하늘에서 떨어지거나 생성되는 과녁 배열
+let targets = [];
 let lastTargetSpawn = 0;
 
-// Web Audio API (별도 음원 파일 없이 모바일에서 타격음/카운트다운 소리 출력)
+// 슬라이더 이벤트 연결
+scaleSlider.addEventListener('input', (e) => {
+  avatarScale = parseFloat(e.target.value);
+  scaleVal.innerText = avatarScale.toFixed(1) + 'x';
+});
+offsetYSlider.addEventListener('input', (e) => {
+  avatarOffsetY = parseFloat(e.target.value);
+  offsetYVal.innerText = (avatarOffsetY > 0 ? '+' : '') + avatarOffsetY + '%';
+});
+document.getElementById('resetScaleBtn').addEventListener('click', () => {
+  avatarScale = 1.0; avatarOffsetY = 0;
+  scaleSlider.value = 1.0; offsetYSlider.value = 0;
+  scaleVal.innerText = '1.0x'; offsetYVal.innerText = '0%';
+});
+
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 function playBeep(freq = 600, duration = 0.1, type = 'sine') {
@@ -158,14 +197,10 @@ function playBeep(freq = 600, duration = 0.1, type = 'sine') {
   } catch (e) {}
 }
 
-// 모바일 화면 자동 꺼짐 방지 (Wake Lock)
 async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
-  } catch (e) {}
+  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
 }
 
-// 1P, 2P 상태 데이터
 const players = [
   { label: "1P", color: "#00ffcc", subColor: "#ff007f", score: 0, baseY: null, curY: 0.5, prevLW: null, prevRW: null, lw: null, rw: null, popup: "", popupTimer: 0 },
   { label: "2P", color: "#ff007f", subColor: "#00ffcc", score: 0, baseY: null, curY: 0.5, prevLW: null, prevRW: null, lw: null, rw: null, popup: "", popupTimer: 0 }
@@ -178,63 +213,46 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// UI: 메뉴 접기 / 펼치기 (모바일 작은 화면 배려)
 document.getElementById('hideMenuBtn').addEventListener('click', (e) => {
   const isHidden = mainMenu.style.display === 'none';
   mainMenu.style.display = isHidden ? 'block' : 'none';
   e.target.innerText = isHidden ? '⚙️ 메뉴 접기' : '⚙️ 메뉴 펼치기';
 });
 
-// UI: 전체화면 토글
 document.getElementById('fullScreenBtn').addEventListener('click', () => {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  } else {
-    document.exitFullscreen().catch(() => {});
-  }
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
 });
 
-// 1. 배경 영상 로드
 document.getElementById('videoInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
     bgVideo.src = URL.createObjectURL(file);
-    statusMsg.innerText = "영상 준비 완료! [⚡ 3초 영점 & 시작]을 누르세요.";
+    statusMsg.innerText = "영상 준비 완료! 크기 조절 후 [⚡ 3초 영점 & 시작]을 누르세요.";
   }
 });
 
-// 2. 1P / 2P 인원 전환
 document.getElementById('modeBtn').addEventListener('click', async (e) => {
   numPlayers = (numPlayers === 1) ? 2 : 1;
   if (numPlayers === 2) {
     e.target.innerText = "👥 1P+2P 같이";
     e.target.classList.add('active-pink');
     box2P.style.display = "block";
-    statusMsg.innerText = "2인 모드: 화면 왼쪽이 1P, 오른쪽이 2P입니다.";
   } else {
     e.target.innerText = "👤 1P 단독";
     e.target.classList.remove('active-pink');
     box2P.style.display = "none";
-    statusMsg.innerText = "1인 모드로 전환되었습니다.";
   }
   if (poseLandmarker) await poseLandmarker.setOptions({ numPoses: numPlayers });
 });
 
-// 3. 과녁 미니게임 ON / OFF
 document.getElementById('targetBtn').addEventListener('click', (e) => {
   targetGameOn = !targetGameOn;
-  e.target.innerText = targetGameOn ? "🎯 과녁게임: ON" : "🎯 과녁게임: OFF";
+  e.target.innerText = targetGameOn ? "🎯 과녁: ON" : "🎯 과녁: OFF";
   e.target.classList.toggle('active-yellow', targetGameOn);
   if (!targetGameOn) targets = [];
 });
 
-// 4. 아바타 크기 전환
-document.getElementById('scaleBtn').addEventListener('click', (e) => {
-  miniAvatarMode = !miniAvatarMode;
-  e.target.innerText = miniAvatarMode ? "크기: 하단 미니" : "크기: 전체";
-});
-
-// 5. 영점 조절 & 시작 (모바일에서 멀리 떨어져도 보이게 중앙 대형 숫자 + 비프음 출력)
 document.getElementById('calibBtn').addEventListener('click', () => {
   requestWakeLock();
   let count = 3;
@@ -242,7 +260,6 @@ document.getElementById('calibBtn').addEventListener('click', () => {
   centerCount.innerText = count;
   playBeep(500, 0.15);
   
-  // 시작 누르면 자동으로 메뉴 접어서 화면 확보
   mainMenu.style.display = 'none';
   document.getElementById('hideMenuBtn').innerText = '⚙️ 메뉴 펼치기';
 
@@ -273,44 +290,52 @@ function spawnParticles(x, y, color, count = 12) {
   }
 }
 
-// 미니게임: 과녁(에너지볼) 생성 함수
 function spawnTarget() {
   const radius = Math.max(Math.min(canvas.width, canvas.height) * 0.065, 28);
-  // 손이 닿기 좋은 화면 상단~중간 영역에 생성
   const x = radius * 1.5 + Math.random() * (canvas.width - radius * 3);
   const y = radius * 2 + Math.random() * (canvas.height * 0.55);
-  const isBonus = Math.random() < 0.25; // 25% 확률로 황금 보너스 타겟
+  const isBonus = Math.random() < 0.25;
   targets.push({
     x, y, radius,
-    vy: Math.random() * 1.2 + 0.4, // 천천히 아래로 내려옴
+    vy: Math.random() * 1.2 + 0.4,
     color: isBonus ? "#ffff00" : "#00ffff",
     points: isBonus ? 30 : 10,
     pulse: 0
   });
 }
 
-function getCoord(landmark) {
-  let x = (1 - landmark.x) * canvas.width;
-  let y = landmark.y * canvas.height;
-  if (miniAvatarMode) {
-    x = canvas.width * 0.15 + x * 0.7;
-    y = canvas.height * 0.35 + y * 0.6;
-  }
-  return { x, y };
+// 플레이어의 골반 중심(anchorX, anchorY)을 기준으로 원하는 배율(avatarScale)만큼 확대/축소 변환
+function getScaledCoord(landmark, anchorX, anchorY) {
+  const rawX = useFallbackVideo ? landmark.x : (1 - landmark.x);
+  const rawY = landmark.y;
+
+  // 몸통 중심에서 떨어진 거리만큼 배율(avatarScale)을 곱해주고 상하 오프셋 적용
+  const scaledX = anchorX + (rawX - anchorX) * avatarScale;
+  const scaledY = anchorY + (rawY - anchorY) * avatarScale + (avatarOffsetY / 100);
+
+  return {
+    x: scaledX * canvas.width,
+    y: scaledY * canvas.height
+  };
 }
 
 function drawPlayer(lm, pState) {
   pState.curY = (lm[11].y + lm[12].y) / 2;
 
-  const nose = getCoord(lm[0]);
-  const lShoulder = getCoord(lm[11]), rShoulder = getCoord(lm[12]);
-  const lElbow = getCoord(lm[13]),    rElbow = getCoord(lm[14]);
-  const lWrist = getCoord(lm[15]),    rWrist = getCoord(lm[16]);
-  const lHip = getCoord(lm[23]),      rHip = getCoord(lm[24]);
-  const lKnee = getCoord(lm[25]),     rKnee = getCoord(lm[26]);
-  const lAnkle = getCoord(lm[27]),    rAnkle = getCoord(lm[28]);
+  // 확대/축소의 기준점이 될 골반 중심 좌표 계산
+  const rawHipX = useFallbackVideo ? (lm[23].x + lm[24].x) / 2 : 1 - (lm[23].x + lm[24].x) / 2;
+  const rawHipY = (lm[23].y + lm[24].y) / 2;
 
-  // 과녁 충돌 판정을 위해 현재 양손 좌표 저장
+  const c = (idx) => getScaledCoord(lm[idx], rawHipX, rawHipY);
+
+  const nose = c(0);
+  const lShoulder = c(11), rShoulder = c(12);
+  const lElbow = c(13),    rElbow = c(14);
+  const lWrist = c(15),    rWrist = c(16);
+  const lHip = c(23),      rHip = c(24);
+  const lKnee = c(25),     rKnee = c(26);
+  const lAnkle = c(27),    rAnkle = c(28);
+
   pState.lw = lWrist;
   pState.rw = rWrist;
 
@@ -319,7 +344,6 @@ function drawPlayer(lm, pState) {
 
   let drawColor = pState.color;
 
-  // 점프 / 스쿼트 판정
   if (pState.baseY !== null) {
     const diff = pState.curY - pState.baseY;
     if (diff < -0.065) {
@@ -333,7 +357,6 @@ function drawPlayer(lm, pState) {
     }
   }
 
-  // 펀치 허공 휘두르기 이펙트
   if (pState.prevLW && pState.prevRW) {
     if (Math.hypot(lWrist.x - pState.prevLW.x, lWrist.y - pState.prevLW.y) > 38) {
       spawnParticles(lWrist.x, lWrist.y, pState.color, 4);
@@ -344,12 +367,14 @@ function drawPlayer(lm, pState) {
   }
   pState.prevLW = lWrist; pState.prevRW = rWrist;
 
-  // 네온 스틱맨 렌더링
+  // 선 굵기도 캐릭터 배율에 비례해서 두꺼워지도록 설정
+  const baseLineWidth = Math.max(6, Math.min(22, 10 * avatarScale));
+
   ctx.save();
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   ctx.shadowColor = drawColor; ctx.shadowBlur = 15;
   ctx.strokeStyle = drawColor;
-  ctx.lineWidth = miniAvatarMode ? 7 : 10;
+  ctx.lineWidth = baseLineWidth;
 
   const drawBone = (p1, p2) => { ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); };
   drawBone(neck, pelvis);
@@ -360,7 +385,7 @@ function drawPlayer(lm, pState) {
   drawBone(rHip, rKnee); drawBone(rKnee, rAnkle);
 
   const shoulderWidth = Math.hypot(lShoulder.x - rShoulder.x, lShoulder.y - rShoulder.y);
-  const headRadius = Math.max(shoulderWidth * 0.35, 20);
+  const headRadius = Math.max(shoulderWidth * 0.35, 16 * avatarScale);
   const headCenter = { x: nose.x, y: neck.y - headRadius * 1.25 };
 
   ctx.fillStyle = "#111";
@@ -369,20 +394,18 @@ function drawPlayer(lm, pState) {
   ctx.fillStyle = pState.subColor;
   ctx.fillRect(headCenter.x - headRadius * 0.6, headCenter.y - headRadius * 0.2, headRadius * 1.2, headRadius * 0.35);
 
-  // 글러브
   const gloveRadius = headRadius * 0.48;
   ctx.fillStyle = "#fff";
   ctx.beginPath(); ctx.arc(lWrist.x, lWrist.y, gloveRadius, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(rWrist.x, rWrist.y, gloveRadius, 0, Math.PI * 2); ctx.fill();
 
-  // 머리 위 1P / 2P 표시
-  ctx.font = "900 18px sans-serif";
+  ctx.font = `900 ${Math.max(14, Math.floor(18 * avatarScale))}px sans-serif`;
   ctx.textAlign = "center";
   ctx.fillStyle = pState.color;
   ctx.fillText(pState.label, headCenter.x, headCenter.y - headRadius - 10);
 
   if (pState.popupTimer > 0) {
-    ctx.font = "italic 900 26px sans-serif";
+    ctx.font = `italic 900 ${Math.max(20, Math.floor(26 * avatarScale))}px sans-serif`;
     ctx.fillStyle = "#ffff00";
     ctx.fillText(pState.popup, headCenter.x, headCenter.y - headRadius - 35);
     pState.popupTimer--;
@@ -390,11 +413,9 @@ function drawPlayer(lm, pState) {
   ctx.restore();
 }
 
-// 미니게임 과녁 업데이트 및 손목 충돌 체크
 function updateAndDrawTargets(now) {
   if (!targetGameOn) return;
 
-  // 1.2초마다 새 과녁 생성 (화면에 최대 5개 유지)
   if (now - lastTargetSpawn > 1200 && targets.length < 5) {
     spawnTarget();
     lastTargetSpawn = now;
@@ -405,26 +426,24 @@ function updateAndDrawTargets(now) {
     t.y += t.vy;
     t.pulse += 0.12;
 
-    // 화면 아래로 벗어나면 삭제
     if (t.y - t.radius > canvas.height) {
       targets.splice(i, 1);
       continue;
     }
 
-    // 1P, 2P의 양손(lw, rw)과 과녁의 충돌 검사
     let hitPlayer = null;
     for (let pIdx = 0; pIdx < numPlayers; pIdx++) {
       const p = players[pIdx];
       if (!p.lw || !p.rw) continue;
+      const hitRange = t.radius + 24 * avatarScale;
       const distL = Math.hypot(p.lw.x - t.x, p.lw.y - t.y);
       const distR = Math.hypot(p.rw.x - t.x, p.rw.y - t.y);
-      if (distL < t.radius + 28 || distR < t.radius + 28) {
+      if (distL < hitRange || distR < hitRange) {
         hitPlayer = p;
         break;
       }
     }
 
-    // 누군가 손으로 먼저 터치했을 때!
     if (hitPlayer) {
       hitPlayer.score += t.points;
       hitPlayer.popup = `+${t.points} HIT! 💥`;
@@ -435,7 +454,6 @@ function updateAndDrawTargets(now) {
       continue;
     }
 
-    // 과녁 그리기 (두근거리는 네온 서클 + 별표)
     const r = t.radius + Math.sin(t.pulse) * 4;
     ctx.save();
     ctx.shadowColor = t.color;
@@ -472,45 +490,46 @@ async function initGame() {
     minTrackingConfidence: 0.5
   });
 
-  // 모바일 전면 카메라(셀카 방향) 우선 호출 및 발열 방지용 480x360 해상도 지정
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
-    audio: false
-  });
-  webcam.srcObject = stream;
-  webcam.addEventListener("loadeddata", () => {
-    statusMsg.innerText = "준비 완료! 인원 선택 후 [⚡ 3초 영점 & 시작]을 누르세요.";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
+      audio: false
+    });
+    webcam.srcObject = stream;
+    webcam.addEventListener("loadeddata", () => {
+      statusMsg.innerText = "준비 완료! 슬라이더로 졸라맨 크기를 맞춘 뒤 시작하세요.";
+      requestAnimationFrame(renderLoop);
+    });
+  } catch (err) {
+    useFallbackVideo = true;
+    statusMsg.innerText = "⚠️ 웹캠 없음: [📂 영상(.mp4)]을 불러오면 영상 속 사람으로 테스트됩니다.";
     requestAnimationFrame(renderLoop);
-  });
+  }
 }
 
 let lastVideoTime = -1;
 function renderLoop(now) {
-  if (webcam.currentTime !== lastVideoTime && poseLandmarker) {
-    lastVideoTime = webcam.currentTime;
-    const result = poseLandmarker.detectForVideo(webcam, now);
+  const targetVideo = useFallbackVideo ? bgVideo : webcam;
+
+  if (targetVideo.readyState >= 2 && targetVideo.currentTime !== lastVideoTime && poseLandmarker) {
+    lastVideoTime = targetVideo.currentTime;
+    const result = poseLandmarker.detectForVideo(targetVideo, now);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 손 좌표 초기화
     players[0].lw = null; players[0].rw = null;
     players[1].lw = null; players[1].rw = null;
 
     if (result.landmarks && result.landmarks.length > 0) {
-      // 왼쪽 사람을 1P, 오른쪽 사람을 2P로 정렬
       const sortedPoses = [...result.landmarks].sort((a, b) => (1 - a[0].x) - (1 - b[0].x));
       sortedPoses.forEach((lm, idx) => {
         if (idx < numPlayers) drawPlayer(lm, players[idx]);
       });
     }
 
-    // 과녁 미니게임 업데이트 및 충돌 체크
     updateAndDrawTargets(now);
-
     score1PEl.innerText = players[0].score;
     score2PEl.innerText = players[1].score;
 
-    // 파티클 업데이트
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx; p.y += p.vy; p.life -= 0.05;
@@ -522,6 +541,9 @@ function renderLoop(now) {
         ctx.restore();
       }
     }
+  } else if (useFallbackVideo && bgVideo.readyState < 2) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    updateAndDrawTargets(now);
   }
   requestAnimationFrame(renderLoop);
 }
