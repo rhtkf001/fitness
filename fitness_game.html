@@ -116,7 +116,6 @@
             <input type="range" id="offsetYSlider" min="-40" max="40" step="2" value="0">
             <span id="offsetYVal" class="val-badge">0%</span>
           </div>
-          <!-- 새롭게 추가된 과녁 속도 및 수량 조절 슬라이더 -->
           <div class="slider-row">
             <span>⏱️ 과녁 속도(생성)</span>
             <input type="range" id="spawnSpeedSlider" min="0.5" max="2.5" step="0.1" value="1.0">
@@ -178,8 +177,8 @@ let poseLandmarker = null;
 let numPlayers = 1;
 let avatarScale = parseFloat(localStorage.getItem('fit_scale')) || 1.0;
 let avatarOffsetY = parseFloat(localStorage.getItem('fit_offsetY')) || 0;
-let spawnIntervalSec = parseFloat(localStorage.getItem('fit_speed')) || 1.0; // 생성 주기 (초)
-let maxTargetsCount = parseInt(localStorage.getItem('fit_maxT')) || 6; // 최대 수량
+let spawnIntervalSec = parseFloat(localStorage.getItem('fit_speed')) || 1.0;
+let maxTargetsCount = parseInt(localStorage.getItem('fit_maxT')) || 6;
 
 let targetGameOn = true;
 let useFallbackVideo = false;
@@ -188,7 +187,6 @@ let targets = [];
 let lastTargetSpawn = 0;
 let nextSpawnTurn = 0;
 
-// 저장된 설정값 UI 반영
 scaleSlider.value = avatarScale; scaleVal.innerText = avatarScale.toFixed(1) + 'x';
 offsetYSlider.value = avatarOffsetY; offsetYVal.innerText = (avatarOffsetY > 0 ? '+' : '') + avatarOffsetY + '%';
 spawnSpeedSlider.value = spawnIntervalSec; spawnSpeedVal.innerText = spawnIntervalSec.toFixed(1) + '초';
@@ -239,12 +237,15 @@ function playBeep(freq = 600, duration = 0.1, type = 'sine') {
   } catch (e) {}
 }
 
+// 장난기 넘치고 힘찬 남자 목소리(영어 음성: pitch 낮춤, rate 빠르게 설정)
 function speakCheer(text) {
   try {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'ko-KR'; utter.rate = 1.2; utter.pitch = 1.3;
+      utter.lang = 'en-US';
+      utter.rate = 1.25;  // 힘차고 빠르게
+      utter.pitch = 0.65; // 무게감 있고 장난스러운 낮은 남성 톤
       window.speechSynthesis.speak(utter);
     }
   } catch (e) {}
@@ -325,7 +326,7 @@ document.getElementById('calibBtn').addEventListener('click', () => {
       clearInterval(timer);
       centerCount.innerText = "GO!";
       playBeep(950, 0.35, 'triangle');
-      speakCheer("시작합니다!");
+      speakCheer("Let's go, baby!"); // 장난기 넘치는 영어 영웅 멘트
       setTimeout(() => { centerCount.style.display = "none"; }, 700);
 
       players[0].baseY = players[0].curY;
@@ -482,7 +483,6 @@ function drawPlayer(lm, pState) {
 function updateAndDrawTargets(now) {
   if (!targetGameOn) return;
 
-  // 슬라이더로 조절한 속도(spawnIntervalSec) 및 수량(maxTargetsCount)을 그대로 적용
   if (now - lastTargetSpawn > (spawnIntervalSec * 1000) && targets.length < maxTargetsCount) {
     spawnTarget();
     lastTargetSpawn = now;
@@ -519,9 +519,12 @@ function updateAndDrawTargets(now) {
       spawnParticles(t.x, t.y, hitPlayer.color, 16);
       playBeep(t.points > 10 ? 1100 : 800, 0.12, 'triangle');
 
+      // 5콤보 달성 시 장난스럽고 힘찬 영어 응원 멘트 출력 ("Awesome!", "Boom!")
       if (hitPlayer.hits % 5 === 0) {
         hitPlayer.feverTimer = 150;
-        speakCheer(hitPlayer.hits === 5 ? "최고예요!" : "정말 잘했어요!");
+        const cheers = ["Boom! Awesome!", "Epic move!", "You are a beast!", "Too fast!"];
+        const randomCheer = cheers[Math.floor(Math.random() * cheers.length)];
+        speakCheer(randomCheer);
       }
 
       targets.splice(i, 1);
