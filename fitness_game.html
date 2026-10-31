@@ -1,4 +1,557 @@
-let useFallbackVideo = false; // 웹캠 유무 체크 변수
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Family Neon Fitness Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden; position: fixed; width: 100%; height: 100%; touch-action: none;
+    }
+    
+    #bgVideo {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 1; opacity: 0.8;
+    }
+    
+    #gameCanvas {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 2; pointer-events: none;
+    }
+
+    #webcam { display: none; }
+
+    #uiLayer {
+      position: absolute; top: 10px; left: 10px; right: 10px; z-index: 3;
+      display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none;
+    }
+    .interactive { pointer-events: auto; }
+
+    .control-wrap { display: flex; flex-direction: column; gap: 6px; max-width: 72%; }
+    .toggle-bar { display: flex; gap: 6px; }
+    
+    .panel {
+      background: rgba(10, 10, 18, 0.88); border: 1px solid #00ffcc;
+      padding: 10px; border-radius: 12px; backdrop-filter: blur(6px);
+      max-height: 85vh; overflow-y: auto;
+    }
+    .btn-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn {
+      background: #00ffcc; color: #000; font-weight: 800; border: none;
+      padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 12px;
+      white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn.active-pink { background: #ff007f; color: #fff; }
+    .btn.active-yellow { background: #ffcc00; color: #000; }
+    .btn.sub-btn { background: #222; color: #fff; border: 1px solid #555; }
+    input[type="file"] { display: none; }
+
+    .slider-box {
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);
+      display: flex; flex-direction: column; gap: 6px; font-size: 12px;
+    }
+    .slider-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .slider-row input[type="range"] { flex: 1; accent-color: #00ffcc; height: 6px; cursor: pointer; }
+    .val-badge {
+      background: #222; color: #00ffcc; padding: 2px 6px; border-radius: 4px;
+      font-weight: bold; min-width: 42px; text-align: center;
+    }
+
+    .score-container { display: flex; gap: 8px; }
+    .score-box { text-align: center; min-width: 82px; padding: 6px 10px; }
+    .score-1p { border-color: #00ffcc; }
+    .score-2p { border-color: #ff007f; display: none; }
+    
+    .score-label { font-size: 11px; font-weight: 800; }
+    .score-num { font-size: 26px; font-weight: 900; line-height: 1.1; }
+    .combo-label { font-size: 10px; color: #ffff00; font-weight: bold; margin-top: 2px; }
+    .c-1p { color: #00ffcc; text-shadow: 0 0 8px #00ffcc; }
+    .c-2p { color: #ff007f; text-shadow: 0 0 8px #ff007f; }
+
+    #centerCount {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 90px; font-weight: 900; color: #ffff00;
+      text-shadow: 0 0 25px #ff007f, 0 0 50px #000;
+      z-index: 4; pointer-events: none; display: none; text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <video id="bgVideo" loop playsinline></video>
+  <video id="webcam" autoplay playsinline muted></video>
+  <canvas id="gameCanvas"></canvas>
+  <div id="centerCount">3</div>
+
+  <div id="uiLayer">
+    <div class="control-wrap interactive">
+      <div class="toggle-bar">
+        <button class="btn sub-btn" id="hideMenuBtn">⚙️ 메뉴 접기</button>
+        <button class="btn sub-btn" id="fullScreenBtn">⛶ 전체화면</button>
+      </div>
+
+      <div class="panel" id="mainMenu">
+        <div class="btn-grid">
+          <label class="btn">
+            📂 영상(.mp4)
+            <input type="file" id="videoInput" accept="video/*">
+          </label>
+          <button class="btn" id="modeBtn">👤 1P 단독</button>
+          <button class="btn active-yellow" id="targetBtn">🎯 맞춤과녁: ON</button>
+          <button class="btn" id="calibBtn">⚡ 3초 키맞춤 & 시작</button>
+        </div>
+
+        <div class="slider-box">
+          <div class="slider-row">
+            <span>🔍 졸라맨 크기</span>
+            <input type="range" id="scaleSlider" min="0.5" max="3.0" step="0.1" value="1.0">
+            <span id="scaleVal" class="val-badge">1.0x</span>
+            <button class="btn sub-btn" id="resetScaleBtn" style="padding:3px 7px; font-size:11px;">초기화</button>
+          </div>
+          <div class="slider-row">
+            <span>↕️ 상하 위치</span>
+            <input type="range" id="offsetYSlider" min="-40" max="40" step="2" value="0">
+            <span id="offsetYVal" class="val-badge">0%</span>
+          </div>
+          <!-- 새롭게 추가된 과녁 속도 및 수량 조절 슬라이더 -->
+          <div class="slider-row">
+            <span>⏱️ 과녁 속도(생성)</span>
+            <input type="range" id="spawnSpeedSlider" min="0.5" max="2.5" step="0.1" value="1.0">
+            <span id="spawnSpeedVal" class="val-badge">1.0초</span>
+          </div>
+          <div class="slider-row">
+            <span>🔢 과녁 최대수량</span>
+            <input type="range" id="maxTargetsSlider" min="2" max="12" step="1" value="6">
+            <span id="maxTargetsVal" class="val-badge">6개</span>
+          </div>
+        </div>
+
+        <div id="statusMsg" style="margin-top:6px; font-size:11px; color:#bbb;">
+          모바일 AI 로딩 중... 카메라 권한을 허용해주세요.
+        </div>
+      </div>
+    </div>
+
+    <div class="score-container interactive">
+      <div class="panel score-box score-1p">
+        <div class="score-label c-1p">1P (왼쪽)</div>
+        <div id="score1P" class="score-num c-1p">0</div>
+        <div id="combo1P" class="combo-label">HIT: 0</div>
+      </div>
+      <div class="panel score-box score-2p" id="box2P">
+        <div class="score-label c-2p">2P (오른쪽)</div>
+        <div id="score2P" class="score-num c-2p">0</div>
+        <div id="combo2P" class="combo-label">HIT: 0</div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const bgVideo = document.getElementById('bgVideo');
+const webcam = document.getElementById('webcam');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const statusMsg = document.getElementById('statusMsg');
+const mainMenu = document.getElementById('mainMenu');
+const centerCount = document.getElementById('centerCount');
+const score1PEl = document.getElementById('score1P');
+const score2PEl = document.getElementById('score2P');
+const combo1PEl = document.getElementById('combo1P');
+const combo2PEl = document.getElementById('combo2P');
+const box2P = document.getElementById('box2P');
+
+const scaleSlider = document.getElementById('scaleSlider');
+const scaleVal = document.getElementById('scaleVal');
+const offsetYSlider = document.getElementById('offsetYSlider');
+const offsetYVal = document.getElementById('offsetYVal');
+const spawnSpeedSlider = document.getElementById('spawnSpeedSlider');
+const spawnSpeedVal = document.getElementById('spawnSpeedVal');
+const maxTargetsSlider = document.getElementById('maxTargetsSlider');
+const maxTargetsVal = document.getElementById('maxTargetsVal');
+
+let poseLandmarker = null;
+let numPlayers = 1;
+let avatarScale = parseFloat(localStorage.getItem('fit_scale')) || 1.0;
+let avatarOffsetY = parseFloat(localStorage.getItem('fit_offsetY')) || 0;
+let spawnIntervalSec = parseFloat(localStorage.getItem('fit_speed')) || 1.0; // 생성 주기 (초)
+let maxTargetsCount = parseInt(localStorage.getItem('fit_maxT')) || 6; // 최대 수량
+
+let targetGameOn = true;
+let useFallbackVideo = false;
+let particles = [];
+let targets = [];
+let lastTargetSpawn = 0;
+let nextSpawnTurn = 0;
+
+// 저장된 설정값 UI 반영
+scaleSlider.value = avatarScale; scaleVal.innerText = avatarScale.toFixed(1) + 'x';
+offsetYSlider.value = avatarOffsetY; offsetYVal.innerText = (avatarOffsetY > 0 ? '+' : '') + avatarOffsetY + '%';
+spawnSpeedSlider.value = spawnIntervalSec; spawnSpeedVal.innerText = spawnIntervalSec.toFixed(1) + '초';
+maxTargetsSlider.value = maxTargetsCount; maxTargetsVal.innerText = maxTargetsCount + '개';
+
+scaleSlider.addEventListener('input', (e) => {
+  avatarScale = parseFloat(e.target.value);
+  scaleVal.innerText = avatarScale.toFixed(1) + 'x';
+  localStorage.setItem('fit_scale', avatarScale);
+});
+offsetYSlider.addEventListener('input', (e) => {
+  avatarOffsetY = parseFloat(e.target.value);
+  offsetYVal.innerText = (avatarOffsetY > 0 ? '+' : '') + avatarOffsetY + '%';
+  localStorage.setItem('fit_offsetY', avatarOffsetY);
+});
+spawnSpeedSlider.addEventListener('input', (e) => {
+  spawnIntervalSec = parseFloat(e.target.value);
+  spawnSpeedVal.innerText = spawnIntervalSec.toFixed(1) + '초';
+  localStorage.setItem('fit_speed', spawnIntervalSec);
+});
+maxTargetsSlider.addEventListener('input', (e) => {
+  maxTargetsCount = parseInt(e.target.value);
+  maxTargetsVal.innerText = maxTargetsCount + '개';
+  localStorage.setItem('fit_maxT', maxTargetsCount);
+});
+
+document.getElementById('resetScaleBtn').addEventListener('click', () => {
+  avatarScale = 1.0; avatarOffsetY = 0; spawnIntervalSec = 1.0; maxTargetsCount = 6;
+  scaleSlider.value = 1.0; offsetYSlider.value = 0; spawnSpeedSlider.value = 1.0; maxTargetsSlider.value = 6;
+  scaleVal.innerText = '1.0x'; offsetYVal.innerText = '0%'; spawnSpeedVal.innerText = '1.0초'; maxTargetsVal.innerText = '6개';
+  localStorage.clear();
+});
+
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function playBeep(freq = 600, duration = 0.1, type = 'sine') {
+  try {
+    if (!audioCtx) audioCtx = new AudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+
+function speakCheer(text) {
+  try {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'ko-KR'; utter.rate = 1.2; utter.pitch = 1.3;
+      window.speechSynthesis.speak(utter);
+    }
+  } catch (e) {}
+}
+
+async function requestWakeLock() {
+  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+
+const players = [
+  { label: "1P", color: "#00ffcc", subColor: "#ff007f", score: 0, hits: 0, feverTimer: 0, baseY: null, curY: 0.5, screenShoulderY: null, screenCenterX: null, prevLW: null, prevRW: null, lw: null, rw: null, popup: "", popupTimer: 0 },
+  { label: "2P", color: "#ff007f", subColor: "#00ffcc", score: 0, hits: 0, feverTimer: 0, baseY: null, curY: 0.5, screenShoulderY: null, screenCenterX: null, prevLW: null, prevRW: null, lw: null, rw: null, popup: "", popupTimer: 0 }
+];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+document.getElementById('hideMenuBtn').addEventListener('click', (e) => {
+  const isHidden = mainMenu.style.display === 'none';
+  mainMenu.style.display = isHidden ? 'block' : 'none';
+  e.target.innerText = isHidden ? '⚙️ 메뉴 접기' : '⚙️ 메뉴 펼치기';
+});
+
+document.getElementById('fullScreenBtn').addEventListener('click', () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
+});
+
+document.getElementById('videoInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    bgVideo.src = URL.createObjectURL(file);
+    statusMsg.innerText = "영상 준비 완료! 키 맞춤 후 시작하세요.";
+  }
+});
+
+document.getElementById('modeBtn').addEventListener('click', async (e) => {
+  numPlayers = (numPlayers === 1) ? 2 : 1;
+  if (numPlayers === 2) {
+    e.target.innerText = "👥 1P+2P 같이";
+    e.target.classList.add('active-pink');
+    box2P.style.display = "block";
+  } else {
+    e.target.innerText = "👤 1P 단독";
+    e.target.classList.remove('active-pink');
+    box2P.style.display = "none";
+  }
+  if (poseLandmarker) await poseLandmarker.setOptions({ numPoses: numPlayers });
+});
+
+document.getElementById('targetBtn').addEventListener('click', (e) => {
+  targetGameOn = !targetGameOn;
+  e.target.innerText = targetGameOn ? "🎯 맞춤과녁: ON" : "🎯 맞춤과녁: OFF";
+  e.target.classList.toggle('active-yellow', targetGameOn);
+  if (!targetGameOn) targets = [];
+});
+
+document.getElementById('calibBtn').addEventListener('click', () => {
+  requestWakeLock();
+  let count = 3;
+  centerCount.style.display = "block";
+  centerCount.innerText = count;
+  playBeep(500, 0.15);
+  
+  mainMenu.style.display = 'none';
+  document.getElementById('hideMenuBtn').innerText = '⚙️ 메뉴 펼치기';
+
+  const timer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      centerCount.innerText = count;
+      playBeep(500, 0.15);
+    } else {
+      clearInterval(timer);
+      centerCount.innerText = "GO!";
+      playBeep(950, 0.35, 'triangle');
+      speakCheer("시작합니다!");
+      setTimeout(() => { centerCount.style.display = "none"; }, 700);
+
+      players[0].baseY = players[0].curY;
+      players[1].baseY = players[1].curY;
+      players[0].score = 0; players[0].hits = 0;
+      players[1].score = 0; players[1].hits = 0;
+      if (bgVideo.src) bgVideo.play();
+    }
+  }, 1000);
+});
+
+function spawnParticles(x, y, color, count = 12) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 7 + 2;
+    particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1.0, color });
+  }
+}
+
+function spawnTarget() {
+  const radius = Math.max(Math.min(canvas.width, canvas.height) * 0.062, 28);
+  let targetX, targetY;
+
+  if (numPlayers === 2) {
+    const p = players[nextSpawnTurn];
+    nextSpawnTurn = (nextSpawnTurn + 1) % 2;
+    const centerX = p.screenCenterX || (nextSpawnTurn === 0 ? canvas.width * 0.28 : canvas.width * 0.72);
+    const shoulderY = p.screenShoulderY || (canvas.height * 0.4);
+    targetX = centerX + (Math.random() * 120 - 60);
+    targetY = shoulderY + (Math.random() * 140 - 40);
+  } else {
+    targetX = radius * 2 + Math.random() * (canvas.width - radius * 4);
+    targetY = canvas.height * 0.25 + Math.random() * (canvas.height * 0.45);
+  }
+
+  targetX = Math.max(radius * 1.5, Math.min(canvas.width - radius * 1.5, targetX));
+  targetY = Math.max(radius * 1.5, Math.min(canvas.height - radius * 1.5, targetY));
+
+  const isBonus = Math.random() < 0.25;
+  targets.push({
+    x: targetX, y: targetY, radius,
+    lifeTime: 180,
+    color: isBonus ? "#ffff00" : "#00ffff",
+    points: isBonus ? 30 : 10,
+    pulse: 0
+  });
+}
+
+function getScaledCoord(landmark, anchorX, anchorY) {
+  const rawX = useFallbackVideo ? landmark.x : (1 - landmark.x);
+  const rawY = landmark.y;
+  const scaledX = anchorX + (rawX - anchorX) * avatarScale;
+  const scaledY = anchorY + (rawY - anchorY) * avatarScale + (avatarOffsetY / 100);
+  return { x: scaledX * canvas.width, y: scaledY * canvas.height };
+}
+
+function drawPlayer(lm, pState) {
+  pState.curY = (lm[11].y + lm[12].y) / 2;
+
+  const rawHipX = useFallbackVideo ? (lm[23].x + lm[24].x) / 2 : 1 - (lm[23].x + lm[24].x) / 2;
+  const rawHipY = (lm[23].y + lm[24].y) / 2;
+
+  const c = (idx) => getScaledCoord(lm[idx], rawHipX, rawHipY);
+
+  const nose = c(0);
+  const lShoulder = c(11), rShoulder = c(12);
+  const lElbow = c(13),    rElbow = c(14);
+  const lWrist = c(15),    rWrist = c(16);
+  const lHip = c(23),      rHip = c(24);
+  const lKnee = c(25),     rKnee = c(26);
+  const lAnkle = c(27),    rAnkle = c(28);
+
+  pState.lw = lWrist;
+  pState.rw = rWrist;
+  pState.screenShoulderY = (lShoulder.y + rShoulder.y) / 2;
+  pState.screenCenterX = (lShoulder.x + rShoulder.x) / 2;
+
+  const neck = { x: (lShoulder.x + rShoulder.x) / 2, y: (lShoulder.y + rShoulder.y) / 2 };
+  const pelvis = { x: (lHip.x + rHip.x) / 2, y: (lHip.y + rHip.y) / 2 };
+
+  let drawColor = pState.color;
+  if (pState.feverTimer > 0) {
+    pState.feverTimer--;
+    const colors = ["#ff0055", "#ffff00", "#00ffcc", "#ff00ff", "#00ffff"];
+    drawColor = colors[Math.floor(Date.now() / 80) % colors.length];
+  }
+
+  if (pState.baseY !== null) {
+    const diff = pState.curY - pState.baseY;
+    if (diff < -0.065) {
+      pState.score += 2;
+      pState.popup = "JUMP! ⚡"; pState.popupTimer = 12;
+    } else if (diff > 0.095) {
+      pState.score += 1;
+      pState.popup = "SQUAT! 🔥"; pState.popupTimer = 12;
+    }
+  }
+
+  if (pState.prevLW && pState.prevRW) {
+    if (Math.hypot(lWrist.x - pState.prevLW.x, lWrist.y - pState.prevLW.y) > 38) {
+      spawnParticles(lWrist.x, lWrist.y, pState.color, 4);
+    }
+    if (Math.hypot(rWrist.x - pState.prevRW.x, rWrist.y - pState.prevRW.y) > 38) {
+      spawnParticles(rWrist.x, rWrist.y, pState.subColor, 4);
+    }
+  }
+  pState.prevLW = lWrist; pState.prevRW = rWrist;
+
+  const baseLineWidth = Math.max(6, Math.min(22, 10 * avatarScale));
+
+  ctx.save();
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.shadowColor = drawColor; ctx.shadowBlur = pState.feverTimer > 0 ? 25 : 15;
+  ctx.strokeStyle = drawColor;
+  ctx.lineWidth = baseLineWidth;
+
+  const drawBone = (p1, p2) => { ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); };
+  drawBone(neck, pelvis);
+  drawBone(lShoulder, rShoulder); drawBone(lHip, rHip);
+  drawBone(lShoulder, lElbow); drawBone(lElbow, lWrist);
+  drawBone(rShoulder, rElbow); drawBone(rElbow, rWrist);
+  drawBone(lHip, lKnee); drawBone(lKnee, lAnkle);
+  drawBone(rHip, rKnee); drawBone(rKnee, rAnkle);
+
+  const shoulderWidth = Math.hypot(lShoulder.x - rShoulder.x, lShoulder.y - rShoulder.y);
+  const headRadius = Math.max(shoulderWidth * 0.35, 16 * avatarScale);
+  const headCenter = { x: nose.x, y: neck.y - headRadius * 1.25 };
+
+  ctx.fillStyle = "#111";
+  ctx.beginPath(); ctx.arc(headCenter.x, headCenter.y, headRadius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = pState.subColor;
+  ctx.fillRect(headCenter.x - headRadius * 0.6, headCenter.y - headRadius * 0.2, headRadius * 1.2, headRadius * 0.35);
+
+  const gloveRadius = headRadius * 0.48;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(lWrist.x, lWrist.y, gloveRadius, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(rWrist.x, rWrist.y, gloveRadius, 0, Math.PI * 2); ctx.fill();
+
+  ctx.font = `900 ${Math.max(14, Math.floor(18 * avatarScale))}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = pState.color;
+  ctx.fillText(pState.label, headCenter.x, headCenter.y - headRadius - 10);
+
+  if (pState.popupTimer > 0) {
+    ctx.font = `italic 900 ${Math.max(20, Math.floor(26 * avatarScale))}px sans-serif`;
+    ctx.fillStyle = "#ffff00";
+    ctx.fillText(pState.popup, headCenter.x, headCenter.y - headRadius - 35);
+    pState.popupTimer--;
+  }
+  ctx.restore();
+}
+
+function updateAndDrawTargets(now) {
+  if (!targetGameOn) return;
+
+  // 슬라이더로 조절한 속도(spawnIntervalSec) 및 수량(maxTargetsCount)을 그대로 적용
+  if (now - lastTargetSpawn > (spawnIntervalSec * 1000) && targets.length < maxTargetsCount) {
+    spawnTarget();
+    lastTargetSpawn = now;
+  }
+
+  for (let i = targets.length - 1; i >= 0; i--) {
+    const t = targets[i];
+    t.pulse += 0.12;
+    t.lifeTime--;
+
+    if (t.lifeTime <= 0) {
+      targets.splice(i, 1);
+      continue;
+    }
+
+    let hitPlayer = null;
+    for (let pIdx = 0; pIdx < numPlayers; pIdx++) {
+      const p = players[pIdx];
+      if (!p.lw || !p.rw) continue;
+      const hitRange = t.radius + 32 * avatarScale;
+      const distL = Math.hypot(p.lw.x - t.x, p.lw.y - t.y);
+      const distR = Math.hypot(p.rw.x - t.x, p.rw.y - t.y);
+      if (distL < hitRange || distR < hitRange) {
+        hitPlayer = p;
+        break;
+      }
+    }
+
+    if (hitPlayer) {
+      hitPlayer.score += t.points * (hitPlayer.feverTimer > 0 ? 2 : 1);
+      hitPlayer.hits++;
+      hitPlayer.popup = `+${t.points} HIT! 🌟`;
+      hitPlayer.popupTimer = 18;
+      spawnParticles(t.x, t.y, hitPlayer.color, 16);
+      playBeep(t.points > 10 ? 1100 : 800, 0.12, 'triangle');
+
+      if (hitPlayer.hits % 5 === 0) {
+        hitPlayer.feverTimer = 150;
+        speakCheer(hitPlayer.hits === 5 ? "최고예요!" : "정말 잘했어요!");
+      }
+
+      targets.splice(i, 1);
+      continue;
+    }
+
+    const alpha = Math.min(1, t.lifeTime / 30);
+    const r = t.radius + Math.sin(t.pulse) * 4;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = t.color;
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = t.color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+    ctx.fill();
+
+    ctx.font = `900 ${Math.floor(t.radius * 0.85)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff";
+    ctx.fillText(t.points > 10 ? "★" : "●", t.x, t.y);
+    ctx.restore();
+  }
+}
 
 async function initGame() {
   const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
@@ -14,7 +567,6 @@ async function initGame() {
     minTrackingConfidence: 0.5
   });
 
-  // 웹캠 연결을 시도하고, 캠이 없으면 자동으로 '배경 영상 분석 모드'로 전환!
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
@@ -22,20 +574,18 @@ async function initGame() {
     });
     webcam.srcObject = stream;
     webcam.addEventListener("loadeddata", () => {
-      statusMsg.innerText = "카메라 연결 완료! [⚡ 3초 영점 & 시작]을 누르세요.";
+      statusMsg.innerText = "준비 완료! 속도와 수량을 맞춘 뒤 시작하세요.";
       requestAnimationFrame(renderLoop);
     });
   } catch (err) {
-    // PC에 웹캠이 없을 때 실행되는 구간
     useFallbackVideo = true;
-    statusMsg.innerText = "⚠️ 웹캠 없음 (PC 테스트 모드): [📂 영상(.mp4)]에 사람이 나오는 영상을 넣으면 즉시 작동합니다!";
+    statusMsg.innerText = "⚠️ 웹캠 없음: [📂 영상(.mp4)]을 넣으면 영상 속 사람으로 테스트됩니다.";
     requestAnimationFrame(renderLoop);
   }
 }
 
 let lastVideoTime = -1;
 function renderLoop(now) {
-  // 웹캠이 있으면 webcam을, 없으면 bgVideo(배경 영상)를 AI에게 전달
   const targetVideo = useFallbackVideo ? bgVideo : webcam;
 
   if (targetVideo.readyState >= 2 && targetVideo.currentTime !== lastVideoTime && poseLandmarker) {
@@ -47,7 +597,6 @@ function renderLoop(now) {
     players[1].lw = null; players[1].rw = null;
 
     if (result.landmarks && result.landmarks.length > 0) {
-      // 웹캠 없을 때는 거울 반전을 끄고 영상 위치 그대로 매칭
       const sortedPoses = [...result.landmarks].sort((a, b) => (1 - a[0].x) - (1 - b[0].x));
       sortedPoses.forEach((lm, idx) => {
         if (idx < numPlayers) drawPlayer(lm, players[idx]);
@@ -55,8 +604,13 @@ function renderLoop(now) {
     }
 
     updateAndDrawTargets(now);
+
     score1PEl.innerText = players[0].score;
-    score2PEl.innerText = players[1].score;
+    combo1PEl.innerText = `HIT: ${players[0].hits}`;
+    if (numPlayers === 2) {
+      score2PEl.innerText = players[1].score;
+      combo2PEl.innerText = `HIT: ${players[1].hits}`;
+    }
 
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -70,7 +624,6 @@ function renderLoop(now) {
       }
     }
   } else if (useFallbackVideo && bgVideo.readyState < 2) {
-    // 영상을 아직 안 골랐을 때도 과녁이 떨어지는지 화면 확인 가능
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     updateAndDrawTargets(now);
   }
@@ -78,3 +631,6 @@ function renderLoop(now) {
 }
 
 initGame();
+</script>
+</body>
+</html>
