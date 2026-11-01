@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Family Neon Fitness Game</title>
+  <title>Family Neon Fitness Game - Turbo</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body {
@@ -60,6 +60,14 @@
       font-weight: bold; min-width: 42px; text-align: center;
     }
 
+    /* 비디오 탐색 바 컨테이너 스타일 */
+    .video-seek-box {
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);
+      display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #aaa;
+    }
+    .seek-row { display: flex; align-items: center; gap: 8px; }
+    .seek-row input[type="range"] { flex: 1; accent-color: #ff007f; height: 6px; cursor: pointer; }
+
     .score-container { display: flex; gap: 8px; }
     .score-box { text-align: center; min-width: 82px; padding: 6px 10px; }
     .score-1p { border-color: #00ffcc; }
@@ -81,7 +89,7 @@
 </head>
 <body>
 
-  <video id="bgVideo" loop playsinline></video>
+  <video id="bgVideo" loop playsinline preload="auto"></video>
   <video id="webcam" autoplay playsinline muted></video>
   <canvas id="gameCanvas"></canvas>
   <div id="centerCount">3</div>
@@ -100,8 +108,19 @@
             <input type="file" id="videoInput" accept="video/*">
           </label>
           <button class="btn" id="modeBtn">👤 1P 단독</button>
-          <button class="btn active-yellow" id="targetBtn">🎯 맞춤과녁: ON</button>
+          <button class="btn active-yellow" id="targetBtn">🎯 과녁: ON</button>
           <button class="btn" id="calibBtn">⚡ 3초 키맞춤 & 시작</button>
+        </div>
+
+        <!-- 영상 탐색 바 (원하는 구간으로 즉시 이동) -->
+        <div class="video-seek-box">
+          <div style="display:flex; justify-content:space-between;">
+            <span>🎬 영상 구간 이동</span>
+            <span id="timeDisplay">00:00 / 00:00</span>
+          </div>
+          <div class="seek-row">
+            <input type="range" id="videoSeeker" min="0" max="100" step="0.1" value="0">
+          </div>
         </div>
 
         <div class="slider-box">
@@ -117,19 +136,19 @@
             <span id="offsetYVal" class="val-badge">0%</span>
           </div>
           <div class="slider-row">
-            <span>⏱️ 과녁 속도(생성)</span>
+            <span>⏱️ 과녁 속도</span>
             <input type="range" id="spawnSpeedSlider" min="0.5" max="2.5" step="0.1" value="1.0">
             <span id="spawnSpeedVal" class="val-badge">1.0초</span>
           </div>
           <div class="slider-row">
-            <span>🔢 과녁 최대수량</span>
+            <span>🔢 과녁 수량</span>
             <input type="range" id="maxTargetsSlider" min="2" max="12" step="1" value="6">
             <span id="maxTargetsVal" class="val-badge">6개</span>
           </div>
         </div>
 
         <div id="statusMsg" style="margin-top:6px; font-size:11px; color:#bbb;">
-          모바일 AI 로딩 중... 카메라 권한을 허용해주세요.
+          초고속 터보 AI 로딩 중... 카메라를 허용해주세요.
         </div>
       </div>
     </div>
@@ -172,6 +191,8 @@ const spawnSpeedSlider = document.getElementById('spawnSpeedSlider');
 const spawnSpeedVal = document.getElementById('spawnSpeedVal');
 const maxTargetsSlider = document.getElementById('maxTargetsSlider');
 const maxTargetsVal = document.getElementById('maxTargetsVal');
+const videoSeeker = document.getElementById('videoSeeker');
+const timeDisplay = document.getElementById('timeDisplay');
 
 let poseLandmarker = null;
 let numPlayers = 1;
@@ -182,6 +203,7 @@ let maxTargetsCount = parseInt(localStorage.getItem('fit_maxT')) || 6;
 
 let targetGameOn = true;
 let useFallbackVideo = false;
+let isSeeking = false;
 let particles = [];
 let targets = [];
 let lastTargetSpawn = 0;
@@ -213,6 +235,34 @@ maxTargetsSlider.addEventListener('input', (e) => {
   localStorage.setItem('fit_maxT', maxTargetsCount);
 });
 
+// 비디오 타임라인 제어 (시분초 포맷 변환)
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
+}
+
+bgVideo.addEventListener('loadedmetadata', () => {
+  videoSeeker.max = bgVideo.duration;
+});
+
+bgVideo.addEventListener('timeupdate', () => {
+  if (!isSeeking && bgVideo.duration) {
+    videoSeeker.value = bgVideo.currentTime;
+    timeDisplay.innerText = `${formatTime(bgVideo.currentTime)} / ${formatTime(bgVideo.duration)}`;
+  }
+});
+
+videoSeeker.addEventListener('input', () => {
+  isSeeking = true;
+  bgVideo.currentTime = parseFloat(videoSeeker.value);
+  timeDisplay.innerText = `${formatTime(bgVideo.currentTime)} / ${formatTime(bgVideo.duration)}`;
+});
+
+videoSeeker.addEventListener('change', () => {
+  isSeeking = false;
+});
+
 document.getElementById('resetScaleBtn').addEventListener('click', () => {
   avatarScale = 1.0; avatarOffsetY = 0; spawnIntervalSec = 1.0; maxTargetsCount = 6;
   scaleSlider.value = 1.0; offsetYSlider.value = 0; spawnSpeedSlider.value = 1.0; maxTargetsSlider.value = 6;
@@ -237,15 +287,12 @@ function playBeep(freq = 600, duration = 0.1, type = 'sine') {
   } catch (e) {}
 }
 
-// 장난기 넘치고 힘찬 남자 목소리(영어 음성: pitch 낮춤, rate 빠르게 설정)
 function speakCheer(text) {
   try {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'en-US';
-      utter.rate = 1.25;  // 힘차고 빠르게
-      utter.pitch = 0.65; // 무게감 있고 장난스러운 낮은 남성 톤
+      utter.lang = 'en-US'; utter.rate = 1.25; utter.pitch = 0.65;
       window.speechSynthesis.speak(utter);
     }
   } catch (e) {}
@@ -282,7 +329,7 @@ document.getElementById('videoInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
     bgVideo.src = URL.createObjectURL(file);
-    statusMsg.innerText = "영상 준비 완료! 키 맞춤 후 시작하세요.";
+    statusMsg.innerText = "영상 준비 완료! 구간바를 밀어 원하는 위치로 맞춰보세요.";
   }
 });
 
@@ -302,7 +349,7 @@ document.getElementById('modeBtn').addEventListener('click', async (e) => {
 
 document.getElementById('targetBtn').addEventListener('click', (e) => {
   targetGameOn = !targetGameOn;
-  e.target.innerText = targetGameOn ? "🎯 맞춤과녁: ON" : "🎯 맞춤과녁: OFF";
+  e.target.innerText = targetGameOn ? "🎯 과녁: ON" : "🎯 과녁: OFF";
   e.target.classList.toggle('active-yellow', targetGameOn);
   if (!targetGameOn) targets = [];
 });
@@ -326,7 +373,7 @@ document.getElementById('calibBtn').addEventListener('click', () => {
       clearInterval(timer);
       centerCount.innerText = "GO!";
       playBeep(950, 0.35, 'triangle');
-      speakCheer("Let's go, baby!"); // 장난기 넘치는 영어 영웅 멘트
+      speakCheer("Let's go, baby!");
       setTimeout(() => { centerCount.style.display = "none"; }, 700);
 
       players[0].baseY = players[0].curY;
@@ -519,12 +566,10 @@ function updateAndDrawTargets(now) {
       spawnParticles(t.x, t.y, hitPlayer.color, 16);
       playBeep(t.points > 10 ? 1100 : 800, 0.12, 'triangle');
 
-      // 5콤보 달성 시 장난스럽고 힘찬 영어 응원 멘트 출력 ("Awesome!", "Boom!")
       if (hitPlayer.hits % 5 === 0) {
         hitPlayer.feverTimer = 150;
         const cheers = ["Boom! Awesome!", "Epic move!", "You are a beast!", "Too fast!"];
-        const randomCheer = cheers[Math.floor(Math.random() * cheers.length)];
-        speakCheer(randomCheer);
+        speakCheer(cheers[Math.floor(Math.random() * cheers.length)]);
       }
 
       targets.splice(i, 1);
@@ -558,6 +603,7 @@ function updateAndDrawTargets(now) {
 
 async function initGame() {
   const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  // 렉을 완전히 없애기 위해 가장 가볍고 빠른 'pose_landmarker_lite' 및 GPU 가속 적용
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
@@ -565,9 +611,9 @@ async function initGame() {
     },
     runningMode: "VIDEO",
     numPoses: numPlayers,
-    minPoseDetectionConfidence: 0.5,
-    minPosePresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5
+    minPoseDetectionConfidence: 0.4,
+    minPosePresenceConfidence: 0.4,
+    minTrackingConfidence: 0.4
   });
 
   try {
@@ -577,7 +623,7 @@ async function initGame() {
     });
     webcam.srcObject = stream;
     webcam.addEventListener("loadeddata", () => {
-      statusMsg.innerText = "준비 완료! 속도와 수량을 맞춘 뒤 시작하세요.";
+      statusMsg.innerText = "터보 모드 준비 완료! 구간바를 움직여 시작하세요.";
       requestAnimationFrame(renderLoop);
     });
   } catch (err) {
