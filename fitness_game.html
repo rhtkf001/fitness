@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Family Neon Fitness Game - Turbo</title>
+  <title>Family Neon Fitness Game - Shoes Fixed</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body {
@@ -60,7 +60,6 @@
       font-weight: bold; min-width: 42px; text-align: center;
     }
 
-    /* 비디오 탐색 바 컨테이너 스타일 */
     .video-seek-box {
       margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);
       display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #aaa;
@@ -112,7 +111,6 @@
           <button class="btn" id="calibBtn">⚡ 3초 키맞춤 & 시작</button>
         </div>
 
-        <!-- 영상 탐색 바 (원하는 구간으로 즉시 이동) -->
         <div class="video-seek-box">
           <div style="display:flex; justify-content:space-between;">
             <span>🎬 영상 구간 이동</span>
@@ -148,7 +146,7 @@
         </div>
 
         <div id="statusMsg" style="margin-top:6px; font-size:11px; color:#bbb;">
-          초고속 터보 AI 로딩 중... 카메라를 허용해주세요.
+          신발 고정 완료! 카메라를 허용해주세요.
         </div>
       </div>
     </div>
@@ -235,7 +233,6 @@ maxTargetsSlider.addEventListener('input', (e) => {
   localStorage.setItem('fit_maxT', maxTargetsCount);
 });
 
-// 비디오 타임라인 제어 (시분초 포맷 변환)
 function formatTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -329,7 +326,7 @@ document.getElementById('videoInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
     bgVideo.src = URL.createObjectURL(file);
-    statusMsg.innerText = "영상 준비 완료! 구간바를 밀어 원하는 위치로 맞춰보세요.";
+    statusMsg.innerText = "영상 준비 완료! 구간바를 움직여 시작하세요.";
   }
 });
 
@@ -385,10 +382,10 @@ document.getElementById('calibBtn').addEventListener('click', () => {
   }, 1000);
 });
 
-function spawnParticles(x, y, color, count = 12) {
+function spawnParticles(x, y, color, count = 10) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 7 + 2;
+    const speed = Math.random() * 6 + 2;
     particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1.0, color });
   }
 }
@@ -474,10 +471,10 @@ function drawPlayer(lm, pState) {
 
   if (pState.prevLW && pState.prevRW) {
     if (Math.hypot(lWrist.x - pState.prevLW.x, lWrist.y - pState.prevLW.y) > 38) {
-      spawnParticles(lWrist.x, lWrist.y, pState.color, 4);
+      spawnParticles(lWrist.x, lWrist.y, pState.color, 3);
     }
     if (Math.hypot(rWrist.x - pState.prevRW.x, rWrist.y - pState.prevRW.y) > 38) {
-      spawnParticles(rWrist.x, rWrist.y, pState.subColor, 4);
+      spawnParticles(rWrist.x, rWrist.y, pState.subColor, 3);
     }
   }
   pState.prevLW = lWrist; pState.prevRW = rWrist;
@@ -508,10 +505,31 @@ function drawPlayer(lm, pState) {
   ctx.fillStyle = pState.subColor;
   ctx.fillRect(headCenter.x - headRadius * 0.6, headCenter.y - headRadius * 0.2, headRadius * 1.2, headRadius * 0.35);
 
+  // 양손 복싱 글러브
   const gloveRadius = headRadius * 0.48;
   ctx.fillStyle = "#fff";
   ctx.beginPath(); ctx.arc(lWrist.x, lWrist.y, gloveRadius, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(rWrist.x, rWrist.y, gloveRadius, 0, Math.PI * 2); ctx.fill();
+
+  // 👟 화려한 네온 신발 (발목 좌표에 확실하게 고정 및 큼직하게 렌더링)
+  const shoeWidth = headRadius * 0.85;
+  const shoeHeight = headRadius * 0.5;
+  
+  ctx.fillStyle = "#fff";
+  ctx.shadowColor = pState.subColor;
+  ctx.shadowBlur = 15;
+  
+  // 왼쪽 신발
+  ctx.beginPath();
+  ctx.ellipse(lAnkle.x, lAnkle.y + 4, shoeWidth, shoeHeight, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 오른쪽 신발
+  ctx.beginPath();
+  ctx.ellipse(rAnkle.x, rAnkle.y + 4, shoeWidth, shoeHeight, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 
   ctx.font = `900 ${Math.max(14, Math.floor(18 * avatarScale))}px sans-serif`;
   ctx.textAlign = "center";
@@ -563,7 +581,7 @@ function updateAndDrawTargets(now) {
       hitPlayer.hits++;
       hitPlayer.popup = `+${t.points} HIT! 🌟`;
       hitPlayer.popupTimer = 18;
-      spawnParticles(t.x, t.y, hitPlayer.color, 16);
+      spawnParticles(t.x, t.y, hitPlayer.color, 12);
       playBeep(t.points > 10 ? 1100 : 800, 0.12, 'triangle');
 
       if (hitPlayer.hits % 5 === 0) {
@@ -603,7 +621,6 @@ function updateAndDrawTargets(now) {
 
 async function initGame() {
   const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
-  // 렉을 완전히 없애기 위해 가장 가볍고 빠른 'pose_landmarker_lite' 및 GPU 가속 적용
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
@@ -611,19 +628,19 @@ async function initGame() {
     },
     runningMode: "VIDEO",
     numPoses: numPlayers,
-    minPoseDetectionConfidence: 0.4,
-    minPosePresenceConfidence: 0.4,
-    minTrackingConfidence: 0.4
+    minPoseDetectionConfidence: 0.3,
+    minPosePresenceConfidence: 0.3,
+    minTrackingConfidence: 0.3
   });
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
+      video: { facingMode: "user", width: { ideal: 320 }, height: { ideal: 240 } },
       audio: false
     });
     webcam.srcObject = stream;
     webcam.addEventListener("loadeddata", () => {
-      statusMsg.innerText = "터보 모드 준비 완료! 구간바를 움직여 시작하세요.";
+      statusMsg.innerText = "신발 장착 완료! 터보 모드로 시작합니다.";
       requestAnimationFrame(renderLoop);
     });
   } catch (err) {
@@ -663,12 +680,12 @@ function renderLoop(now) {
 
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
-      p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+      p.x += p.vx; p.y += p.vy; p.life -= 0.08;
       if (p.life <= 0) particles.splice(i, 1);
       else {
         ctx.save();
         ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
     }
